@@ -113,7 +113,7 @@
 start_link() ->
     Members = nodes(),
     {InitEagers, InitLazys} = init_peers(Members),
-    Mods = app_helper:get_env(cluster_metadata, broadcast_mods, [cluster_metadata_manager]),
+    Mods = application:get_env(cluster_metadata, broadcast_mods, [cluster_metadata_manager]),
     Res = start_link(Members, InitEagers, InitLazys, Mods),
     Res.
 
@@ -408,7 +408,7 @@ maybe_exchange(undefined, State) ->
 maybe_exchange(Peer, State=#state{mods=[Mod | _],exchanges=Exchanges}) ->
     %% limit the number of exchanges this node can start concurrently.
     %% the exchange must (currently?) implement any "inbound" concurrency limits
-    ExchangeLimit = app_helper:get_env(cluster_metadata, broadcast_start_exchange_limit, 1),
+    ExchangeLimit = application:get_env(cluster_metadata, broadcast_start_exchange_limit, 1),
     BelowLimit = not (length(Exchanges) >= ExchangeLimit),
     FreeMod = lists:keyfind(Mod, 1, Exchanges) =:= false,
     case BelowLimit and FreeMod of
@@ -576,7 +576,7 @@ schedule_exchange_tick() ->
     schedule_tick(exchange_tick, broadcast_exchange_timer, 10000).
 
 schedule_tick(Message, Timer, Default) ->
-    TickMs = app_helper:get_env(cluster_metadata, Timer, Default),
+    TickMs = application:get_env(cluster_metadata, Timer, Default),
     erlang:send_after(TickMs, ?MODULE, Message).
 
 reset_peers(AllMembers, EagerPeers, LazyPeers, State) ->
@@ -604,20 +604,20 @@ init_peers(Members) ->
         N when N < 5 ->
             %% 2 to 4 members, start with a fully connected tree
             %% with cycles. it will be adjusted as needed
-            Tree = riak_core_util:build_tree(1, Members, [cycles]),
+            Tree = cluster_metadata_util:build_tree(1, Members, [cycles]),
             InitEagers = orddict:fetch(node(), Tree),
             InitLazys  = [lists:nth(rand:uniform(N - 2), Members -- [node() | InitEagers])];
         N when N < 10 ->
             %% 5 to 9 members, start with gossip tree used by
             %% riak_core_gossip. it will be adjusted as needed
-            Tree = riak_core_util:build_tree(2, Members, [cycles]),
+            Tree = cluster_metadata_util:build_tree(2, Members, [cycles]),
             InitEagers = orddict:fetch(node(), Tree),
             InitLazys  = [lists:nth(rand:uniform(N - 3), Members -- [node() | InitEagers])];
         N ->
             %% 10 or more members, use a tree similar to riak_core_gossip
             %% but with higher fanout (larger initial eager set size)
             NEagers = round(math:log(N) + 1),
-            Tree = riak_core_util:build_tree(NEagers, Members, [cycles]),
+            Tree = cluster_metadata_util:build_tree(NEagers, Members, [cycles]),
             InitEagers = orddict:fetch(node(), Tree),
             InitLazys  = [lists:nth(rand:uniform(N - (NEagers + 1)), Members -- [node() | InitEagers])]
     end,

@@ -305,7 +305,7 @@ graft(Context, Obj) ->
 %% @doc Trigger an exchange
 -spec exchange(node()) -> {ok, pid()} | {error, term()}.
 exchange(Peer) ->
-    Timeout = app_helper:get_env(cluster_metadata, metadata_exchange_timeout, 60000),
+    Timeout = application:get_env(cluster_metadata, metadata_exchange_timeout, 60000),
     case cluster_metadata_exchange_fsm:start(Peer, Timeout) of
         {ok, Pid} ->
             {ok, Pid};
@@ -656,8 +656,8 @@ dets_filename({Prefix, SubPrefix}=FullPrefix) ->
 dets_filename_part(Part) when is_atom(Part) ->
     dets_filename_part(list_to_binary(atom_to_list(Part)));
 dets_filename_part(Part) when is_binary(Part) ->
-    <<MD5Int:128/integer>> = riak_core_util:md5(Part),
-    riak_core_util:integer_to_list(MD5Int, 16).
+    <<MD5Int:128/integer>> = cluster_metadata_util:md5(Part),
+    cluster_metadata_util:integer_to_list(MD5Int, 16).
 
 dets_filename_trailer(FullPrefix) ->
     [dets_filename_trailer_part(Part) || Part <- tuple_to_list(FullPrefix)].

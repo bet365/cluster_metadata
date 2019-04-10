@@ -1,22 +1,3 @@
-%% -------------------------------------------------------------------
-%%
-%% Copyright (c) 2013 Basho Technologies, Inc.  All Rights Reserved.
-%%
-%% This file is provided to you under the Apache License,
-%% Version 2.0 (the "License"); you may not use this file
-%% except in compliance with the License.  You may obtain
-%% a copy of the License at
-%%
-%%   http://www.apache.org/licenses/LICENSE-2.0
-%%
-%% Unless required by applicable law or agreed to in writing,
-%% software distributed under the License is distributed on an
-%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-%% KIND, either express or implied.  See the License for the
-%% specific language governing permissions and limitations
-%% under the License.
-%%
-%% -------------------------------------------------------------------
 -module(cluster_metadata_broadcast).
 
 -behaviour(gen_server).
@@ -25,9 +6,9 @@
 -export([start_link/0,
          start_link/4,
          broadcast/2,
-         ring_update/1,
          broadcast_members/0,
          broadcast_members/1,
+         member_update/1,
          exchanges/0,
          exchanges/1,
          cancel_exchanges/1]).
@@ -111,7 +92,12 @@
 %% to generate membership updates as the ring changes.
 -spec start_link() -> {ok, pid()} | ignore | {error, term()}.
 start_link() ->
-    Members = nodes(),
+    MemberFun = application:get_env(cluster_metadata, member_fun, 
+                                    fun cluster_metadata_nodes:nodes/0),
+    MemberUpdateFun = application:get_env(cluster_metadata, member_update_fun, 
+                                          fun cluster_metadata_nodes:callback/0),
+    Members = MemberFun(),
+    MemberUpdateFun(fun ?MODULE:member_update/1),
     {InitEagers, InitLazys} = init_peers(Members),
     Mods = application:get_env(cluster_metadata, broadcast_mods, [cluster_metadata_manager]),
     Res = start_link(Members, InitEagers, InitLazys, Mods),
@@ -147,9 +133,9 @@ broadcast(Broadcast, Mod) ->
 
 
 %% @doc Notifies broadcast server of membership update given a new ring
--spec ring_update(riak_core_ring:riak_core_ring()) -> ok.
-ring_update(Ring) ->
-    gen_server:cast(?SERVER, {ring_update, Ring}).
+-spec member_update(list()) -> ok.
+member_update(Members) ->
+    gen_server:cast(?SERVER, {member_update, Members}).
 
 %% @doc Returns the broadcast servers view of full cluster membership.
 %% Wait indefinitely for a response is returned from the process
@@ -277,8 +263,8 @@ handle_cast({graft, MessageId, Mod, Round, Root, From}, State) ->
     Result = Mod:graft(MessageId),
     State1 = handle_graft(Result, MessageId, Mod, Round, Root, From, State),
     {noreply, State1};
-handle_cast({ring_update, Ring}, State=#state{all_members=BroadcastMembers}) ->
-    CurrentMembers = ordsets:from_list(all_broadcast_members(Ring)),
+handle_cast({member_update, Members}, State=#state{all_members=BroadcastMembers}) ->
+    CurrentMembers = ordsets:from_list(Members),
     New = ordsets:subtract(CurrentMembers, BroadcastMembers),
     Removed = ordsets:subtract(BroadcastMembers, CurrentMembers),
     State1 = case ordsets:size(New) > 0 of
@@ -587,9 +573,6 @@ reset_peers(AllMembers, EagerPeers, LazyPeers, State) ->
       lazy_sets     = orddict:new(),
       all_members   = ordsets:from_list(AllMembers)
      }.
-
-all_broadcast_members(Ring) ->
-    riak_core_ring:all_members(Ring).
 
 init_peers(Members) ->
     case length(Members) of

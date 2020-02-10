@@ -13,10 +13,14 @@
          terminate/2,
          code_change/3]).
 
+-export([up_nodes/0,
+         callback/1]).
+
 -define(SERVER, ?MODULE).
 
 -record(state, {
-            broadcast_fun :: function() 
+          nodes :: list(),
+          broadcast_fun :: function()
 }).
 
 %%%===================================================================
@@ -26,25 +30,18 @@
 start_link(BroadcastFun) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [BroadcastFun], []).
 
+up_nodes() ->
+    [erlang:node()|erlang:nodes()].
+
+callback(Fun) ->
+    gen_server:call(?MODULE, {callback, Fun}).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
-
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Initializes the server
-%%
-%% @spec init(Args) -> {ok, State} |
-%%                     {ok, State, Timeout} |
-%%                     ignore |
-%%                     {stop, Reason}
-%% @end
-%%--------------------------------------------------------------------
 init([BroadcastFun]) ->
-    %% subscribe to net_kernel nodedown/nodeup events.
-    net_kernel:monitor_nodes(true, []),
-    {ok, #state{broadcast_fun = BroadcastFun}}.
+    ok = net_kernel:monitor_nodes(true),
+    {ok, #state{broadcast_fun = BroadcastFun, nodes = up_nodes()}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -60,6 +57,8 @@ init([BroadcastFun]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_call({callback, Fun}, _From, State) ->
+    {reply, ok, State#state{broadcast_fun = Fun}};
 handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
@@ -87,8 +86,14 @@ handle_cast(_Msg, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_info({nodedown, Node}, State = #state{broadcast_fun = BroadcastFun}) ->
-    BroadcastFun(),
+handle_info({nodedown, Node}, State = #state{broadcast_fun = BroadcastFun,
+                                             nodes = Nodes}) ->
+    BroadcastFun(Nodes -- [Node]),
+    {noreply, State};
+
+handle_info({nodeup, Node}, State = #state{broadcast_fun = BroadcastFun,
+                                           nodes = Nodes}) ->
+    BroadcastFun([Node|Nodes]),
     {noreply, State};
 
 handle_info(_Info, State) ->
@@ -122,7 +127,3 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-
-
-
-

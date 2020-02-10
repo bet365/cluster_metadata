@@ -1,10 +1,18 @@
 {"1.1.0",
-[{<<"eleveldb">>,
+[{<<"dvvset">>,
+  {git,"git://github.com/ricardobcl/dotted-version-vectors.git",
+       {ref,"27fd1225c10a7dc4890e5e55abddf6db2392f6cc"}},
+  0},
+ {<<"eleveldb">>,
   {git,"git://github.com/basho/eleveldb.git",
        {ref,"25aa7d028c2c88e5a8593fe70b750bda11ec364f"}},
   0},
  {<<"gen_fsm_compat">>,{pkg,<<"gen_fsm_compat">>,<<"0.3.0">>},0},
  {<<"goldrush">>,{pkg,<<"goldrush">>,<<"0.1.9">>},1},
+ {<<"hashtree">>,
+  {git,"git://github.com/martincox/hashtree.git",
+       {ref,"267974bc81e7bcb0287038cd9accc61d4079d108"}},
+  0},
  {<<"lager">>,{pkg,<<"lager">>,<<"3.6.9">>},0}]}.
 [
 {pkg_hash,[

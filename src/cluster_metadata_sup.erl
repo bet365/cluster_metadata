@@ -36,14 +36,11 @@ init([]) ->
 
     Manager = #{id => cluster_metadata_manager, 
                 start => {cluster_metadata_manager, start_link, [Opts]}},
-    Hashtree = #{id => cluster_metadata_hashtree, 
-                 start => {cluster_metadata_hashtree, start_link, []}},
-
-    {ok, {{one_for_all, 0, 1}, [Manager, Hashtree]}}.
+    {ok, {{one_for_all, 0, 1}, [Manager]}}.
 
 %%====================================================================
 %% Internal functions
 %%====================================================================
 
 default_data_dir() ->
-    atom_to_list(node()).
+    filename:join(["/tmp", atom_to_list(node())]).

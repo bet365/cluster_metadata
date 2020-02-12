@@ -36,7 +36,9 @@ init([]) ->
 
     Manager = #{id => cluster_metadata_manager, 
                 start => {cluster_metadata_manager, start_link, [Opts]}},
-    {ok, {{one_for_all, 0, 1}, [Manager]}}.
+    Hashtree = #{id => cluster_metadata_hashtree, 
+                start => {cluster_metadata_hashtree, start_link, [DataDir]}},
+    {ok, {{one_for_all, 0, 1}, [Manager, Hashtree]}}.
 
 %%====================================================================
 %% Internal functions
